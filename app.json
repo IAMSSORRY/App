@@ -8,7 +8,8 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "kr.hs.dgsw.ssorry"
+      "bundleIdentifier": "kr.hs.dgsw.ssorry",
+      "appleTeamId": "6UQ42CB9BP"
     },
     "android": {
       "adaptiveIcon": {

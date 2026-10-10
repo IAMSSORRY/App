@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import { Platform } from 'react-native'
 
 // 앱에는 개발 서버 프록시가 없으므로 항상 서버 주소로 직접 부른다.
 // EXPO_PUBLIC_API_BASE 가 있으면 그것을, 없으면 app.json 의 extra.apiBase(https://api.apah.site)를 쓴다.
@@ -126,8 +127,11 @@ async function control(path: string, body?: object) {
 
 export const api = {
   // 세션 쿠키(ssorry_sid) 발급용. 웹소켓은 이 쿠키가 없으면 4401 로 닫힌다.
-  // 앱의 fetch 가 받은 쿠키는 기기 쿠키 저장소에 남고, 웹소켓도 같은 저장소의 쿠키를 붙여 보낸다.
-  session: () => request<{ session: string; connections: number }>('/session'),
+  session: () =>
+    request<{ session: string; connections: number }>('/session').then((d) => {
+      sessionId = d.session
+      return d
+    }),
   health: () => request<Health>('/health'),
   cameras: () => request<Cameras>('/cameras'),
   arm: () => request<ArmStatus>('/arm'),
@@ -177,5 +181,13 @@ export function wsUrl(path: string) {
   return `${proto}://${API_BASE.replace(/^https?:\/\//, '')}${path}`
 }
 
-// 쿠키 헤더를 직접 붙이면 안 된다. iOS 는 저장소 쿠키에 이어 붙여 "ssorry_sid=a,ssorry_sid=a" 가 되어 서버가 세션을 못 찾는다.
-export const openSocket = (path: string) => new WebSocket(wsUrl(path))
+let sessionId: string | null = null
+
+// iOS 웹소켓은 fetch 와 같은 쿠키 저장소의 쿠키를 붙인다. 여기에 Cookie 헤더를 또 주면
+// "ssorry_sid=a,ssorry_sid=a" 로 이어 붙어 서버가 세션을 못 찾으므로 헤더를 주지 않는다.
+// 안드로이드 웹소켓은 WebView 쿠키 저장소를 보는데 fetch 가 받은 쿠키가 거기 없어서, /session 이 준 값을 직접 붙인다.
+export function openSocket(path: string) {
+  if (Platform.OS !== 'android' || !sessionId) return new WebSocket(wsUrl(path))
+  const AndroidWebSocket = WebSocket as unknown as new (url: string, protocols: null, options: { headers: Record<string, string> }) => WebSocket
+  return new AndroidWebSocket(wsUrl(path), null, { headers: { Cookie: `ssorry_sid=${sessionId}` } })
+}
